@@ -1,15 +1,16 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React from "react";
+import logo from "./logo.svg";
+import "./App.css";
+import { StockfishWrapper } from "./StockfishWrapper";
 
 function App() {
+  new StockfishWrapper();
   return (
     <div className="App">
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
         <p>
-          fuck the polics
-          Edit <code>src/App.tsx</code> and save to reload.
+          fuck the polics Edit <code>src/App.tsx</code> and save to reload.
         </p>
         <a
           className="App-link"
