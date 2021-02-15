@@ -17,6 +17,7 @@ function App() {
           lastMove,
           bestMove,
           scoreDiff,
+          bestMoveArrow,
         }) => (
           <div>
             <Chessground
@@ -28,6 +29,7 @@ function App() {
               fen={fen}
               onMove={onMove}
               style={{ margin: "auto" }}
+              drawable={bestMoveArrow ? { autoShapes: [bestMoveArrow] } : {}}
             />
             <p>score: {score}</p>
             <p>bestMove: {bestMove}</p>

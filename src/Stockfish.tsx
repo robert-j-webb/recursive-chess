@@ -100,6 +100,9 @@ class Stockfish extends Component {
       calcMovable: this.calcMovable,
       bestMove,
       scoreDiff,
+      bestMoveArrow: bestMove
+        ? { orig: bestMove![0], dest: bestMove![1], brush: "paleBlue" }
+        : null,
     });
   }
 }
