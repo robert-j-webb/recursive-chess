@@ -1,28 +1,35 @@
 import React from "react";
-import logo from "./logo.svg";
 import "./App.css";
-import { StockfishWrapper } from "./StockfishWrapper";
+import Chessboard from "chessboardjsx";
+import Stockfish from "./Stockfish";
 
 function App() {
-  new StockfishWrapper();
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          fuck the polics Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div style={boardsContainer}>
+      <Stockfish>
+        {({ position, onDrop }) => (
+          <Chessboard
+            id="stockfish"
+            position={position}
+            width={320}
+            onDrop={onDrop}
+            boardStyle={boardStyle}
+            orientation="white"
+          />
+        )}
+      </Stockfish>
     </div>
   );
 }
+
+const boardsContainer = {
+  display: "flex",
+  justifyContent: "space-around",
+  alignItems: "center",
+};
+const boardStyle = {
+  borderRadius: "5px",
+  boxShadow: `0 5px 15px rgba(0, 0, 0, 0.5)`,
+};
 
 export default App;
