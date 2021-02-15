@@ -14,10 +14,12 @@ export class StockfishWrapper {
   private engineStatus!: EngineStatus;
   private time!: ChessTime;
   private playerColor!: "white" | "black";
-  private setState!: (state: any) => void;
+  private setScore!: (state: any) => void;
+  private onMove!: (from, to) => void;
 
-  async init(setStateFn: (state: any) => void) {
-    this.setState = setStateFn;
+  async init(setScore, onMove) {
+    this.setScore = setScore;
+    this.onMove = onMove;
     await window.Stockfish().then((sf) => {
       // webpack 😭
       this.game = (Chess as any)();
@@ -60,8 +62,7 @@ export class StockfishWrapper {
       /// Did the AI move?
       if (match) {
         // isEngineRunning = false;
-        this.game.move({ from: match[1], to: match[2], promotion: match[3] });
-        this.setState({ fen: this.game.fen() });
+        this.onMove(match[1], match[2]);
         this.prepareMove();
         /// Is it sending feedback?
       } else if ((match = line.match(/^info .*\bdepth (\d+) .*\bnps (\d+)/))) {
@@ -87,7 +88,7 @@ export class StockfishWrapper {
               ? "<= "
               : ">= ") + this.engineStatus.score;
         }
-        this.setState({ score: this.engineStatus.score });
+        this.setScore(this.engineStatus.score);
       }
     }
     // displayStatus();

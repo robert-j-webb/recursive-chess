@@ -1,21 +1,24 @@
 import React from "react";
 import "./App.css";
-import Chessboard from "chessboardjsx";
 import Stockfish from "./Stockfish";
+import Chessground from "react-chessground";
+import "react-chessground/dist/styles/chessground.css";
 
 function App() {
   return (
     <div style={boardsContainer}>
       <Stockfish>
-        {({ position, onDrop, score }) => (
+        {({ fen, onMove, score, turnColor, calcMovable, lastMove }) => (
           <div>
-            <Chessboard
-              id="stockfish"
-              position={position}
-              width={320}
-              onDrop={onDrop}
-              boardStyle={boardStyle}
-              orientation="white"
+            <Chessground
+              width="38vw"
+              height="38vw"
+              turnColor={turnColor()}
+              movable={calcMovable()}
+              // lastMove={lastMove}
+              fen={fen}
+              onMove={onMove}
+              style={{ margin: "auto" }}
             />
             <span>score: {score}</span>
           </div>
