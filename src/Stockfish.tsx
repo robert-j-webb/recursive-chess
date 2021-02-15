@@ -1,16 +1,27 @@
 import { Component } from "react";
 import PropTypes from "prop-types";
 import { StockfishWrapper } from "./StockfishWrapper";
+import Chess, { ChessInstance } from "chess.js";
 
 class Stockfish extends Component {
-  private stockfishWrapper;
+  private stockfishWrapper = new StockfishWrapper();
+  private game!: ChessInstance;
+
   static propTypes = { children: PropTypes.func };
 
-  state = { fen: "start", score: 0, lastMove: [] };
+  state = {
+    fen: "start",
+    score: 0,
+    lastMove: [],
+    bestMove: undefined,
+    scoreDiff: 0,
+  };
 
-  onMove = (from, to) => {
+  onMove = async (from, to) => {
+    const prevScore = this.state.score;
+    const prevHistory = this.game.history({ verbose: true });
     // see if the move is legal
-    const move = this.stockfishWrapper.game.move({
+    const move = this.game.move({
       from,
       to,
       promotion: "q",
@@ -19,23 +30,24 @@ class Stockfish extends Component {
     // illegal move
     if (move === null) return;
 
-    this.setState({ lastMove: [from, to] });
+    const fen = this.game.fen();
+    this.setState({ lastMove: [from, to], fen });
 
-    return new Promise<void>((resolve) => {
-      this.setState({ fen: this.stockfishWrapper.game.fen() });
-      resolve();
-    }).then(() => this.stockfishWrapper.prepareMove());
+    const bestMove = await this.stockfishWrapper.getBestMove(prevHistory);
+    const scoreDiff = prevScore - this.state.score;
+
+    this.setState({ bestMove, scoreDiff });
   };
 
   turnColor = () => {
-    if (!this.stockfishWrapper) {
+    if (!this.game) {
       return "w";
     }
-    return this.stockfishWrapper.game.turn() === "w" ? "white" : "black";
+    return this.game.turn() === "w" ? "white" : "black";
   };
 
   calcMovable = () => {
-    if (!this.stockfishWrapper) {
+    if (!this.game) {
       return {
         free: false,
         color: "white",
@@ -55,8 +67,8 @@ class Stockfish extends Component {
       };
     }
     const dests = new Map();
-    this.stockfishWrapper.game.SQUARES.forEach((s) => {
-      const ms = this.stockfishWrapper.game.moves({ square: s, verbose: true });
+    this.game.SQUARES.forEach((s) => {
+      const ms = this.game.moves({ square: s, verbose: true });
       if (ms.length)
         dests.set(
           s,
@@ -66,24 +78,19 @@ class Stockfish extends Component {
     return {
       free: false,
       dests,
-      color: "white",
+      color: this.game.turn() === "w" ? "white" : "black",
     };
   };
 
   async componentDidMount() {
-    this.stockfishWrapper = new StockfishWrapper();
-    await this.stockfishWrapper.init(
-      (score) => this.setState({ score }),
-      (from, to) => this.onMove(from, to)
-    );
+    this.game = (Chess as any)();
+    await this.stockfishWrapper.init((score) => this.setState({ score }));
 
-    this.setState({ fen: this.stockfishWrapper.game.fen() });
-
-    this.stockfishWrapper.prepareMove();
+    this.setState({ fen: this.game.fen() });
   }
 
   render() {
-    const { fen, score, lastMove } = this.state;
+    const { fen, score, lastMove, bestMove, scoreDiff } = this.state;
     return (this.props.children as any)({
       fen,
       onMove: this.onMove,
@@ -91,6 +98,8 @@ class Stockfish extends Component {
       lastMove,
       turnColor: this.turnColor,
       calcMovable: this.calcMovable,
+      bestMove,
+      scoreDiff,
     });
   }
 }

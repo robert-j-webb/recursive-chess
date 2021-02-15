@@ -8,7 +8,16 @@ function App() {
   return (
     <div style={boardsContainer}>
       <Stockfish>
-        {({ fen, onMove, score, turnColor, calcMovable, lastMove }) => (
+        {({
+          fen,
+          onMove,
+          score,
+          turnColor,
+          calcMovable,
+          lastMove,
+          bestMove,
+          scoreDiff,
+        }) => (
           <div>
             <Chessground
               width="38vw"
@@ -20,7 +29,9 @@ function App() {
               onMove={onMove}
               style={{ margin: "auto" }}
             />
-            <span>score: {score}</span>
+            <p>score: {score}</p>
+            <p>bestMove: {bestMove}</p>
+            <p>scoreDiff: {scoreDiff}</p>
           </div>
         )}
       </Stockfish>

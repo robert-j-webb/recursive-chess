@@ -1,4 +1,6 @@
-import Chess, { ChessInstance } from "chess.js";
+import { Move } from "chess.js";
+import clone from "underscore/modules/clone";
+import isEqual from "underscore/modules/isEqual";
 
 declare global {
   interface Window {
@@ -9,28 +11,27 @@ declare global {
 type MessageListener = (line: string) => unknown | void;
 
 export class StockfishWrapper {
-  private game!: ChessInstance;
   private stockfishWrapper!: StockfishMessageWrapper;
   private engineStatus!: EngineStatus;
   private time!: ChessTime;
   private playerColor!: "white" | "black";
-  private setScore!: (state: any) => void;
-  private onMove!: (from, to) => void;
+  private setScore!: (state: string) => void;
+  private lastBestMove?: ChessMove;
+  public currentColor!: string;
 
-  async init(setScore, onMove) {
+  async init(setScore: (state: string) => void) {
     this.setScore = setScore;
-    this.onMove = onMove;
     await window.Stockfish().then((sf) => {
-      // webpack 😭
-      this.game = (Chess as any)();
       sf.addMessageListener((line) => this.onMessage(line));
       this.time = {
         wtime: 3000,
         btime: 3000,
         winc: 1500,
         binc: 1500,
+        searchTime: 2000,
       };
       this.playerColor = "white";
+      this.currentColor = "w";
 
       this.stockfishWrapper = sf;
       this.uciCmd("uci");
@@ -38,15 +39,11 @@ export class StockfishWrapper {
       this.uciCmd("isready");
       this.engineStatus = {
         engineLoaded: true,
-        score: 0,
+        score: "0",
         engineReady: false,
         search: "",
       };
     });
-  }
-
-  uciCmd(msg: string) {
-    this.stockfishWrapper.postMessage(msg);
   }
 
   onMessage(event: any) {
@@ -61,10 +58,7 @@ export class StockfishWrapper {
       let match = line.match(/^bestmove ([a-h][1-8])([a-h][1-8])([qrbn])?/);
       /// Did the AI move?
       if (match) {
-        // isEngineRunning = false;
-        this.onMove(match[1], match[2]);
-        this.prepareMove();
-        /// Is it sending feedback?
+        this.lastBestMove = [match[1], match[2]];
       } else if ((match = line.match(/^info .*\bdepth (\d+) .*\bnps (\d+)/))) {
         this.engineStatus.search = "Depth: " + match[1] + " Nps: " + match[2];
       }
@@ -72,7 +66,7 @@ export class StockfishWrapper {
       /// Is it sending feed back with a score?
       if ((match = line.match(/^info .*\bscore (\w+) (-?\d+)/))) {
         let score =
-          parseInt(match[2], 10) * (this.game.turn() === "w" ? 1 : -1);
+          parseInt(match[2], 10) * (this.currentColor === "w" ? 1 : -1);
         /// Is it measuring in centipawns?
         if (match[1] === "cp") {
           this.engineStatus.score = (score / 100.0).toFixed(2);
@@ -84,50 +78,30 @@ export class StockfishWrapper {
         /// Is the score bounded?
         if ((match = line.match(/\b(upper|lower)bound\b/))) {
           this.engineStatus.score =
-            ((match[1] === "upper") === (this.game.turn() === "w")
+            ((match[1] === "upper") === (this.currentColor === "w")
               ? "<= "
               : ">= ") + this.engineStatus.score;
         }
         this.setScore(this.engineStatus.score);
       }
     }
-    // displayStatus();
   }
 
-  prepareMove() {
-    // stopClock();/
-    // this.setState({ fen: game.fen() });
-    let turn = this.game.turn() === "w" ? "white" : "black";
-    if (!this.game.game_over()) {
-      // if (turn === playerColor) {
-      if (turn !== this.playerColor) {
-        // playerColor = playerColor === 'white' ? 'black' : 'white';
-        this.uciCmd("position startpos moves" + this.getMoves());
-        this.uciCmd(`go movetime 2000`);
-        // const { depth, nodes } = this.time;
-        // if (this.time.wtime) {
-        //   this.uciCmd(
-        //     `go movetime `
-        //     `go ${depth} depth ${nodes} nodes 5000 movetime` +
-        //       ` wtime ${this.time.wtime} btime ${this.time.btime}`
-        //   );
-        // } else {
-        //   this.uciCmd(`go ${depth} depth ${nodes} nodes 5000 movetime`);
-        // }
-        // isEngineRunning = true;
-      }
-      if (
-        this.game.history().length >= 2 &&
-        !this.time.depth &&
-        !this.time.nodes
-      ) {
-        //startClock();
-      }
-    }
+  async getBestMove(history: Move[]): Promise<ChessMove> {
+    this.uciCmd("position startpos moves" + this.getMoves(history));
+    this.uciCmd(`go movetime ${this.time.searchTime}`);
+    const startTime = new Date();
+    const prevLastMove = clone(this.lastBestMove);
+    await pollUntil(() => !isEqual(this.lastBestMove, prevLastMove));
+    const endTime = new Date();
+    console.log(
+      `${(endTime.getTime() - startTime.getTime()) / 1000}s of searching`
+    );
+    return this.lastBestMove!;
   }
-  getMoves() {
+
+  getMoves(history: Move[]) {
     let moves = "";
-    let history = this.game.history({ verbose: true });
 
     for (let i = 0; i < history.length; ++i) {
       let move = history[i];
@@ -137,13 +111,35 @@ export class StockfishWrapper {
 
     return moves;
   }
+
+  uciCmd(msg: string) {
+    this.stockfishWrapper.postMessage(msg);
+  }
 }
+
+async function pollUntil<T>(
+  condition: () => T,
+  timeout: number = 5000,
+  interval: number = 50
+): Promise<T> {
+  const timeoutPoll = setTimeout(() => {
+    throw new Error(`Waited for ${timeout}ms with no result.`);
+  }, timeout);
+  let result: T;
+  while (!(result = condition())) {
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), interval));
+  }
+  clearTimeout(timeoutPoll);
+  return result;
+}
+
+type ChessMove = string[];
 
 interface EngineStatus {
   engineLoaded: boolean;
   engineReady: boolean;
   search: string;
-  score: number | string;
+  score: string;
 }
 
 interface ChessTime {
@@ -153,6 +149,7 @@ interface ChessTime {
   binc: number;
   depth?: number;
   nodes?: number;
+  searchTime: number;
 }
 
 interface StockfishMessageWrapper {
