@@ -3,6 +3,7 @@ import "./App.css";
 import Stockfish from "./Stockfish";
 import Chessground from "react-chessground";
 import "react-chessground/dist/styles/chessground.css";
+import ScoreDisplay from "./ScoreDisplay";
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           bestMove,
           scoreDiff,
           bestMoveArrow,
+          isCalculating,
         }) => (
           <div>
             <Chessground
@@ -29,9 +31,10 @@ function App() {
               fen={fen}
               onMove={onMove}
               style={{ margin: "auto" }}
+              viewOnly={isCalculating}
               drawable={bestMoveArrow ? { autoShapes: [bestMoveArrow] } : {}}
             />
-            <p>score: {score}</p>
+            <ScoreDisplay score={score} />
             <p>bestMove: {bestMove}</p>
             <p>scoreDiff: {scoreDiff}</p>
           </div>

@@ -1,7 +1,8 @@
 import { Component } from "react";
 import PropTypes from "prop-types";
-import { StockfishWrapper } from "./StockfishWrapper";
+import { StockfishWrapper, ScoreType, Score } from "./StockfishWrapper";
 import Chess, { ChessInstance } from "chess.js";
+import { diffScores } from "./ScoreDisplay";
 
 class Stockfish extends Component {
   private stockfishWrapper = new StockfishWrapper();
@@ -11,10 +12,11 @@ class Stockfish extends Component {
 
   state = {
     fen: "start",
-    score: 0,
+    score: { val: 0, type: ScoreType.Centipawns } as Score,
     lastMove: [],
     bestMove: undefined,
-    scoreDiff: 0,
+    scoreDiff: undefined,
+    isCalculating: false,
   };
 
   onMove = async (from, to) => {
@@ -31,12 +33,31 @@ class Stockfish extends Component {
     if (move === null) return;
 
     const fen = this.game.fen();
-    this.setState({ lastMove: [from, to], fen });
 
+    this.setState({
+      lastMove: [from, to],
+      fen,
+      isCalculating: true,
+    });
+
+    // We ask stockfish what was the best possible move the player could have made.
     const bestMove = await this.stockfishWrapper.getBestMove(prevHistory);
-    const scoreDiff = prevScore - this.state.score;
+    const bestPossbileScore = this.state.score;
 
-    this.setState({ bestMove, scoreDiff });
+    // By limiting the search to the move the player made, we can force stockfish to give us the actual move score.
+    await this.stockfishWrapper.getBestMove(prevHistory, `${from}${to}`);
+    const actualMoveScore = this.state.score;
+
+    this.setState({
+      isCalculating: false,
+      bestMove,
+      scoreDiff: diffScores(
+        actualMoveScore,
+        prevScore,
+        bestPossbileScore,
+        this.game.turn()
+      ),
+    });
   };
 
   turnColor = () => {
@@ -90,7 +111,14 @@ class Stockfish extends Component {
   }
 
   render() {
-    const { fen, score, lastMove, bestMove, scoreDiff } = this.state;
+    const {
+      fen,
+      score,
+      lastMove,
+      bestMove,
+      scoreDiff,
+      isCalculating,
+    } = this.state;
     return (this.props.children as any)({
       fen,
       onMove: this.onMove,
@@ -100,6 +128,7 @@ class Stockfish extends Component {
       calcMovable: this.calcMovable,
       bestMove,
       scoreDiff,
+      isCalculating,
       bestMoveArrow: bestMove
         ? { orig: bestMove![0], dest: bestMove![1], brush: "paleBlue" }
         : null,
