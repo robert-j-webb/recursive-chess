@@ -57,10 +57,12 @@ export class StockfishWrapper {
     } else if (line === "readyok") {
       this.engineStatus.engineReady = true;
     } else {
-      let match = line.match(/^bestmove ([a-h][1-8])([a-h][1-8])([qrbn])?/);
+      let match = line.match(
+        /^bestmove (([a-h][1-8])([a-h][1-8])([qrbn])?|(\(none\)))/
+      );
       /// Did the AI move?
       if (match) {
-        this.lastBestMove = [match[1], match[2]];
+        this.lastBestMove = [match[2], match[3]];
         this.bestMoveCount++;
       } else if ((match = line.match(/^info .*\bdepth (\d+) .*\bnps (\d+)/))) {
         this.engineStatus.search = "Depth: " + match[1] + " Nps: " + match[2];

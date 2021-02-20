@@ -10448,11 +10448,6 @@ typescript@^4.1.2:
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.1.5.tgz#123a3b214aaff3be32926f0d8f1f6e704eb89a72"
   integrity sha512-6OSu9PTIzmn9TCDiovULTnET6BgXtDYL4Gg4szY+cGsc3JP1dQL8qvE8kShTRx1NIw4Q9IBHlwODjkjWEtMUyA==
 
-udnerscore@^0.0.1:
-  version "0.0.1"
-  resolved "https://registry.yarnpkg.com/udnerscore/-/udnerscore-0.0.1.tgz#3d602e48f7a06559ea70ff9ca9e5abd23334eb2a"
-  integrity sha512-iMxEBKxUPhSe3wQ9oBDcrMbnPFyt4s+hlXsaRp6cg0RYa3wQdB4oqOLxOp+xnPs/u+XaG54IolKXjdXK1GNYzw==
-
 underscore@^1.12.0:
   version "1.12.0"
   resolved "https://registry.yarnpkg.com/underscore/-/underscore-1.12.0.tgz#4814940551fc80587cef7840d1ebb0f16453be97"

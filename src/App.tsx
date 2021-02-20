@@ -1,6 +1,7 @@
 import React from "react";
 import "./App.css";
 import Stockfish from "./Stockfish";
+import PgnInput from "./PgnInput";
 import Chessground from "react-chessground";
 import "react-chessground/dist/styles/chessground.css";
 import ScoreDisplay from "./ScoreDisplay";
@@ -21,6 +22,8 @@ function App() {
           didInterrupt,
           bestMoveArrow,
           isCalculating,
+          onFenSubmit,
+          pgn,
         }) => {
           const scoreJsx = (
             <div>
@@ -32,6 +35,8 @@ function App() {
 
           return (
             <div>
+              <p>Pgn Input</p>
+              <PgnInput onSubmit={onFenSubmit} />
               <Chessground
                 width="38vw"
                 height="38vw"
@@ -48,6 +53,8 @@ function App() {
               {didInterrupt && (
                 <p>You interrupted the engine. You won't see shenanigans</p>
               )}
+              <p>Current PGN: </p>
+              <p>{pgn}</p>
             </div>
           );
         }}

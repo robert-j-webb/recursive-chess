@@ -13,11 +13,11 @@ class Stockfish extends Component {
   state = {
     fen: "start",
     score: { val: 0, type: ScoreType.Centipawns } as Score,
-    lastMove: [],
     bestMove: undefined,
     scoreDiff: undefined,
     isCalculating: false,
     didInterrupt: false,
+    pgn: "",
   };
 
   onMove = async (from, to) => {
@@ -41,8 +41,8 @@ class Stockfish extends Component {
     }
 
     this.setState({
-      lastMove: [from, to],
       fen,
+      pgn: this.game.pgn(),
       isCalculating: true,
     });
 
@@ -110,6 +110,17 @@ class Stockfish extends Component {
     };
   };
 
+  async onFenSubmit(pgn: string) {
+    const wasLoaded = this.game.load_pgn(pgn);
+    if (!wasLoaded) {
+      console.error("invalid pgn");
+      return;
+    }
+    const prevMove = this.game.undo()!;
+    this.setState({ score: 0 });
+    this.onMove(prevMove.from, prevMove.to);
+  }
+
   async componentDidMount() {
     this.game = (Chess as any)();
     await this.stockfishWrapper.init((score) => this.setState({ score }));
@@ -121,23 +132,24 @@ class Stockfish extends Component {
     const {
       fen,
       score,
-      lastMove,
       bestMove,
       scoreDiff,
       didInterrupt,
       isCalculating,
+      pgn,
     } = this.state;
     return (this.props.children as any)({
       fen,
       onMove: this.onMove,
       score,
-      lastMove,
       turnColor: this.turnColor,
       calcMovable: this.calcMovable,
       bestMove,
       scoreDiff,
       isCalculating,
       didInterrupt,
+      onFenSubmit: this.onFenSubmit.bind(this),
+      pgn,
       bestMoveArrow: bestMove
         ? { orig: bestMove![0], dest: bestMove![1], brush: "paleBlue" }
         : null,
