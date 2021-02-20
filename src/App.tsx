@@ -18,27 +18,39 @@ function App() {
           lastMove,
           bestMove,
           scoreDiff,
+          didInterrupt,
           bestMoveArrow,
           isCalculating,
-        }) => (
-          <div>
-            <Chessground
-              width="38vw"
-              height="38vw"
-              turnColor={turnColor()}
-              movable={calcMovable()}
-              // lastMove={lastMove}
-              fen={fen}
-              onMove={onMove}
-              style={{ margin: "auto" }}
-              viewOnly={isCalculating}
-              drawable={bestMoveArrow ? { autoShapes: [bestMoveArrow] } : {}}
-            />
-            <ScoreDisplay score={score} />
-            <p>bestMove: {bestMove}</p>
-            <p>scoreDiff: {scoreDiff}</p>
-          </div>
-        )}
+        }) => {
+          const scoreJsx = (
+            <div>
+              <ScoreDisplay score={score} />
+              <p>bestMove: {bestMove}</p>
+              <p>scoreDiff: {scoreDiff}</p>
+            </div>
+          );
+
+          return (
+            <div>
+              <Chessground
+                width="38vw"
+                height="38vw"
+                turnColor={turnColor()}
+                movable={calcMovable()}
+                // lastMove={lastMove}
+                fen={fen}
+                onMove={onMove}
+                style={{ margin: "auto" }}
+                // viewOnly={isCalculating}
+                drawable={bestMoveArrow ? { autoShapes: [bestMoveArrow] } : {}}
+              />
+              {!isCalculating ? scoreJsx : <p>Calculating...</p>}
+              {didInterrupt && (
+                <p>You interrupted the engine. You won't see shenanigans</p>
+              )}
+            </div>
+          );
+        }}
       </Stockfish>
     </div>
   );

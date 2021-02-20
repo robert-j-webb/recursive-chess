@@ -29,7 +29,7 @@ export class StockfishWrapper {
         btime: 3000,
         winc: 1500,
         binc: 1500,
-        searchTime: 500,
+        searchTime: 1000,
       };
       this.playerColor = "white";
       this.currentColor = "w";
@@ -126,6 +126,10 @@ export class StockfishWrapper {
     }
 
     return moves;
+  }
+
+  stopCalculations() {
+    this.uciCmd("stop");
   }
 
   uciCmd(msg: string) {

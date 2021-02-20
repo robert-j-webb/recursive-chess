@@ -17,6 +17,7 @@ class Stockfish extends Component {
     bestMove: undefined,
     scoreDiff: undefined,
     isCalculating: false,
+    didInterrupt: false,
   };
 
   onMove = async (from, to) => {
@@ -33,6 +34,11 @@ class Stockfish extends Component {
     if (move === null) return;
 
     const fen = this.game.fen();
+
+    if (this.state.isCalculating) {
+      this.stockfishWrapper.stopCalculations();
+      this.setState({ didInterrupt: true });
+    }
 
     this.setState({
       lastMove: [from, to],
@@ -51,6 +57,7 @@ class Stockfish extends Component {
     this.setState({
       isCalculating: false,
       bestMove,
+      didInterrupt: false,
       scoreDiff: diffScores(
         actualMoveScore,
         prevScore,
@@ -117,6 +124,7 @@ class Stockfish extends Component {
       lastMove,
       bestMove,
       scoreDiff,
+      didInterrupt,
       isCalculating,
     } = this.state;
     return (this.props.children as any)({
@@ -129,6 +137,7 @@ class Stockfish extends Component {
       bestMove,
       scoreDiff,
       isCalculating,
+      didInterrupt,
       bestMoveArrow: bestMove
         ? { orig: bestMove![0], dest: bestMove![1], brush: "paleBlue" }
         : null,
