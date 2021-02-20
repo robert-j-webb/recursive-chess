@@ -18,6 +18,7 @@ class Stockfish extends Component {
     isCalculating: false,
     didInterrupt: false,
     pgn: "",
+    bestLine: [] as string[],
   };
 
   onMove = async (from, to) => {
@@ -53,6 +54,16 @@ class Stockfish extends Component {
     // By limiting the search to the move the player made, we can force stockfish to give us the actual move score.
     await this.stockfishWrapper.getBestMove(prevHistory, `${from}${to}`);
     const actualMoveScore = this.state.score;
+
+    if (
+      actualMoveScore.type === ScoreType.Mate &&
+      this.state.bestLine.length > 1
+    ) {
+      this.onMove(
+        this.state.bestLine[1].slice(0, 2),
+        this.state.bestLine[1].slice(2, 4)
+      );
+    }
 
     this.setState({
       isCalculating: false,
@@ -123,7 +134,9 @@ class Stockfish extends Component {
 
   async componentDidMount() {
     this.game = (Chess as any)();
-    await this.stockfishWrapper.init((score) => this.setState({ score }));
+    await this.stockfishWrapper.init((score, bestLine) =>
+      this.setState({ score, bestLine })
+    );
 
     this.setState({ fen: this.game.fen() });
   }
@@ -137,6 +150,7 @@ class Stockfish extends Component {
       didInterrupt,
       isCalculating,
       pgn,
+      bestLine,
     } = this.state;
     return (this.props.children as any)({
       fen,
@@ -149,6 +163,7 @@ class Stockfish extends Component {
       isCalculating,
       didInterrupt,
       onFenSubmit: this.onFenSubmit.bind(this),
+      bestLine,
       pgn,
       bestMoveArrow: bestMove
         ? { orig: bestMove![0], dest: bestMove![1], brush: "paleBlue" }

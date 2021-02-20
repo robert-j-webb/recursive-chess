@@ -24,12 +24,14 @@ function App() {
           isCalculating,
           onFenSubmit,
           pgn,
+          bestLine,
         }) => {
           const scoreJsx = (
             <div>
               <ScoreDisplay score={score} />
               <p>bestMove: {bestMove}</p>
               <p>scoreDiff: {scoreDiff}</p>
+              <p>Current Best Line: {bestLine}</p>
             </div>
           );
 

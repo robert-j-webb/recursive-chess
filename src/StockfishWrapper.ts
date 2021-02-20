@@ -15,12 +15,12 @@ export class StockfishWrapper {
   private engineStatus!: EngineStatus;
   private time!: ChessTime;
   private playerColor!: "white" | "black";
-  private setScore!: (state: Score) => void;
+  private setScore!: (state: Score, bestLine: string[]) => void;
   private lastBestMove?: ChessMove;
   private bestMoveCount = 0;
   public currentColor!: string;
 
-  async init(setScore: (state: Score) => void) {
+  async init(setScore: (state: Score, bestLine: string[]) => void) {
     this.setScore = setScore;
     await window.Stockfish().then((sf) => {
       sf.addMessageListener((line) => this.onMessage(line));
@@ -29,7 +29,7 @@ export class StockfishWrapper {
         btime: 3000,
         winc: 1500,
         binc: 1500,
-        searchTime: 1000,
+        searchTime: 200,
       };
       this.playerColor = "white";
       this.currentColor = "w";
@@ -85,6 +85,8 @@ export class StockfishWrapper {
           };
         }
 
+        const bestLine = line.match(BEST_LINE_REGEX)[1].split(" ");
+
         // /// Is the score bounded?
         // if ((match = line.match(/\b(upper|lower)bound\b/))) {
         //   const isUpper = match[1] === "upper";
@@ -93,7 +95,7 @@ export class StockfishWrapper {
         //     type: isUpper ? ScoreType.Upperbound : ScoreType.Lowerbound,
         //   };
         // }
-        this.setScore(this.engineStatus.score);
+        this.setScore(this.engineStatus.score, bestLine);
       }
     }
   }
@@ -196,3 +198,6 @@ interface StockfishMessageWrapper {
   postMessage: (command: string) => void;
   postRun: () => void;
 }
+
+// https://regex101.com/r/a7fsCh/1/
+const BEST_LINE_REGEX = /\spv\s([\s\w\s]*)/;
