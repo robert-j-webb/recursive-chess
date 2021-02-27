@@ -3,10 +3,12 @@ import PropTypes from "prop-types";
 import { StockfishWrapper, ScoreType, Score } from "./StockfishWrapper";
 import Chess, { ChessInstance } from "chess.js";
 import { diffScores } from "./ScoreDisplay";
+import { io } from "socket.io-client";
 
 class Stockfish extends Component {
   private stockfishWrapper = new StockfishWrapper();
   private game!: ChessInstance;
+  private socket = io("ws://localhost:3001");
 
   static propTypes = { children: PropTypes.func };
 
@@ -33,6 +35,8 @@ class Stockfish extends Component {
 
     // illegal move
     if (move === null) return;
+
+    this.socket.send(`${from},${to}`);
 
     const fen = this.game.fen();
 
@@ -137,6 +141,11 @@ class Stockfish extends Component {
     await this.stockfishWrapper.init((score, bestLine) =>
       this.setState({ score, bestLine })
     );
+
+    this.socket.onAny(async (data: string) => {
+      const [from, to] = data.split(",");
+      this.onMove(from, to);
+    });
 
     this.setState({ fen: this.game.fen() });
   }

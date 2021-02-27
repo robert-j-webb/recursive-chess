@@ -1,6 +1,4 @@
 import { Move } from "chess.js";
-import clone from "underscore/modules/clone";
-import isEqual from "underscore/modules/isEqual";
 
 declare global {
   interface Window {
@@ -22,6 +20,7 @@ export class StockfishWrapper {
 
   async init(setScore: (state: Score, bestLine: string[]) => void) {
     this.setScore = setScore;
+
     await window.Stockfish().then((sf) => {
       sf.addMessageListener((line) => this.onMessage(line));
       this.time = {
