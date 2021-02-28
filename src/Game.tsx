@@ -1,15 +1,16 @@
 import { Component } from "react";
 import PropTypes from "prop-types";
-import { ScoreType, Score } from "./StockfishWrapper";
+import { ScoreType, Score, ChessMove } from "./StockfishWrapper";
 import Chess, { ChessInstance, Move } from "chess.js";
 import { diffScores } from "./ScoreDisplay";
 import { Socket } from "socket.io-client";
 
 interface Props {
   children: unknown;
-  score: Score;
-  bestLine: string[];
-  getBestMove: (history: Move[], searchMoves?: string) => Promise<string[]>;
+  getBestMove: (
+    history: Move[],
+    searchMoves?: string
+  ) => Promise<{ bestMove: ChessMove; score: Score }>;
   stopCalculations: () => void;
   socket: Socket;
   id: number;
@@ -20,8 +21,6 @@ class Game extends Component<Props> {
 
   static propTypes = {
     children: PropTypes.func,
-    score: PropTypes.instanceOf(Score),
-    bestLine: PropTypes.arrayOf(PropTypes.string),
     getBestMove: PropTypes.func,
     stopCalculations: PropTypes.func,
     socket: PropTypes.instanceOf(Socket),
@@ -35,10 +34,12 @@ class Game extends Component<Props> {
     isCalculating: false,
     didInterrupt: false,
     pgn: "",
+    score: new Score(0, ScoreType.Centipawns),
+    bestLine: "",
   };
 
   onMove = async (from, to) => {
-    const prevScore = this.props.score;
+    const prevScore = this.state.score;
     const prevHistory = this.game.history({ verbose: true });
     // see if the move is legal
     const move = this.game.move({
@@ -50,7 +51,7 @@ class Game extends Component<Props> {
     // illegal move
     if (move === null) return;
 
-    this.props.socket.send(`${this.props.id},${from},${to}`);
+    this.props.socket.emit("move", `${this.props.id},${from},${to}`);
 
     const fen = this.game.fen();
 
@@ -66,20 +67,23 @@ class Game extends Component<Props> {
     });
 
     // We ask stockfish what was the best possible move the player could have made.
-    const bestMove = await this.props.getBestMove(prevHistory);
-    const bestPossbileScore = this.props.score;
+    const { bestMove, score: bestPossbileScore } = await this.props.getBestMove(
+      prevHistory
+    );
 
     // By limiting the search to the move the player made, we can force stockfish to give us the actual move score.
-    await this.props.getBestMove(prevHistory, `${from}${to}`);
-    const actualMoveScore = this.props.score;
+    const { score: actualMoveScore } = await this.props.getBestMove(
+      prevHistory,
+      `${from}${to}`
+    );
 
     if (
       actualMoveScore.type === ScoreType.Mate &&
-      this.props.bestLine.length > 1
+      this.state.bestLine.length > 1
     ) {
       this.onMove(
-        this.props.bestLine[1].slice(0, 2),
-        this.props.bestLine[1].slice(2, 4)
+        this.state.bestLine[1].slice(0, 2),
+        this.state.bestLine[1].slice(2, 4)
       );
     }
 
@@ -87,6 +91,7 @@ class Game extends Component<Props> {
       isCalculating: false,
       bestMove,
       didInterrupt: false,
+      score: actualMoveScore,
       scoreDiff: diffScores(
         actualMoveScore,
         prevScore,
@@ -153,7 +158,7 @@ class Game extends Component<Props> {
   async componentDidMount() {
     this.game = (Chess as any)();
 
-    this.props.socket.onAny(async (data: string) => {
+    this.props.socket.on("move", async (data: string) => {
       const [id, from, to] = data.split(",");
       if (Number(id) !== this.props.id) {
         return;
@@ -172,9 +177,13 @@ class Game extends Component<Props> {
       didInterrupt,
       isCalculating,
       pgn,
+      score,
+      bestLine,
     } = this.state;
     return (this.props.children as any)({
       fen,
+      score,
+      bestLine,
       onMove: this.onMove,
       turnColor: this.turnColor,
       calcMovable: this.calcMovable,

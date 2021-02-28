@@ -35,13 +35,7 @@ export class StockfishWrapper {
   private bestMoveCount = 0;
   public currentColor!: string;
 
-  async init(
-    setScore: (state: Score) => void,
-    setBestLine: (bestLine: string[]) => void
-  ): Promise<StockfishWrapper> {
-    this.setScore = setScore;
-    this.setBestLine = setBestLine;
-
+  async init(): Promise<StockfishWrapper> {
     await window.Stockfish().then((sf) => {
       sf.addMessageListener((line) => this.onMessage(line));
       this.time = {
@@ -49,7 +43,7 @@ export class StockfishWrapper {
         btime: 3000,
         winc: 1500,
         binc: 1500,
-        searchTime: 200,
+        searchTime: 5000,
       };
       this.playerColor = "white";
       this.currentColor = "w";
@@ -94,16 +88,13 @@ export class StockfishWrapper {
         let score = parseInt(match[2], 10);
         /// Is it measuring in centipawns?
         if (match[1] === "cp") {
-          this.engineStatus.score = {
-            val: Math.round(score) / 100,
-            type: ScoreType.Centipawns,
-          };
+          this.engineStatus.score = new Score(
+            Math.round(score) / 100,
+            ScoreType.Centipawns
+          );
           /// Did it find a mate?
         } else if (match[1] === "mate") {
-          this.engineStatus.score = {
-            val: Math.abs(score),
-            type: ScoreType.Mate,
-          };
+          this.engineStatus.score = new Score(Math.abs(score), ScoreType.Mate);
         }
 
         const bestLine = line.match(BEST_LINE_REGEX)[1].split(" ");
@@ -116,13 +107,14 @@ export class StockfishWrapper {
         //     type: isUpper ? ScoreType.Upperbound : ScoreType.Lowerbound,
         //   };
         // }
-        this.setScore(this.engineStatus.score);
-        this.setBestLine(bestLine);
       }
     }
   }
 
-  async getBestMove(history: Move[], searchMoves?: string): Promise<ChessMove> {
+  async getBestMove(
+    history: Move[],
+    searchMoves?: string
+  ): Promise<{ bestMove: ChessMove; score: Score }> {
     if (this.engineStatus.isCalculating) {
       await pollUntil(() => !this.engineStatus.isCalculating);
     }
@@ -139,7 +131,7 @@ export class StockfishWrapper {
     const prevBestMoveCount = this.bestMoveCount;
     await pollUntil(() => prevBestMoveCount < this.bestMoveCount);
     this.engineStatus.isCalculating = false;
-    return this.lastBestMove!;
+    return { bestMove: this.lastBestMove!, score: this.engineStatus.score };
   }
 
   getMoves(history: Move[]) {
@@ -179,7 +171,7 @@ async function pollUntil<T>(
   return result;
 }
 
-type ChessMove = string[];
+export type ChessMove = string[];
 
 interface EngineStatus {
   engineLoaded: boolean;
@@ -209,5 +201,5 @@ interface StockfishMessageWrapper {
   postRun: () => void;
 }
 
-// https://regex101.com/r/a7fsCh/1/
+// https://r\egex101.com/r/a7fsCh/1/
 const BEST_LINE_REGEX = /\spv\s([\s\w\s]*)/;

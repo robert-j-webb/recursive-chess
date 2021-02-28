@@ -20,6 +20,7 @@ io.on("connection", (socket) => {
   socket.join("first");
   // handle the event sent with socket.send()
   socket.on("message", (data) => {
+    console.log(data);
     socket.to("first").emit(data);
   });
 });
