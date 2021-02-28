@@ -12,6 +12,7 @@ interface Props {
   getBestMove: (history: Move[], searchMoves?: string) => Promise<string[]>;
   stopCalculations: () => void;
   socket: Socket;
+  id: number;
 }
 
 class Game extends Component<Props> {
@@ -24,6 +25,7 @@ class Game extends Component<Props> {
     getBestMove: PropTypes.func,
     stopCalculations: PropTypes.func,
     socket: PropTypes.instanceOf(Socket),
+    id: PropTypes.number,
   };
 
   state = {
@@ -48,7 +50,7 @@ class Game extends Component<Props> {
     // illegal move
     if (move === null) return;
 
-    this.props.socket.send(`${from},${to}`);
+    this.props.socket.send(`${this.props.id},${from},${to}`);
 
     const fen = this.game.fen();
 
@@ -152,7 +154,10 @@ class Game extends Component<Props> {
     this.game = (Chess as any)();
 
     this.props.socket.onAny(async (data: string) => {
-      const [from, to] = data.split(",");
+      const [id, from, to] = data.split(",");
+      if (Number(id) !== this.props.id) {
+        return;
+      }
       this.onMove(from, to);
     });
 
