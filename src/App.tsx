@@ -1,6 +1,6 @@
 import React, { useState, useEffect, CSSProperties } from "react";
 import "./App.css";
-import Game from "./Game";
+import Game, { GameResult } from "./Game";
 import PgnInput from "./PgnInput";
 import Chessground from "react-chessground";
 import "react-chessground/dist/styles/chessground.css";
@@ -31,7 +31,7 @@ function App() {
   useEffect(() => void socket.on("add", addGame));
 
   useEffect(() => {
-    games.length < 2 && setTimeout(addGame, 1000);
+    games.length < 1 && setTimeout(addGame, 1000);
   });
 
   if (!stockfishWrapper!) {
@@ -96,9 +96,13 @@ function initGame(
         pgn,
         score,
         bestLine,
+        gameOutcome,
       }) => {
+        const isGameOver = gameOutcome !== GameResult.ONGOING;
+
         const scoreJsx = (
           <div style={scoreDisplay}>
+            {!isGameOver && <p>Game over: {gameOutcome}</p>}
             <ScoreDisplay score={score} />
             <p>bestMove: {bestMove}</p>
             <p>scoreDiff: {scoreDiff}</p>
@@ -119,8 +123,12 @@ function initGame(
               fen={fen}
               onMove={onMove}
               style={{ margin: "auto" }}
-              // viewOnly={isCalculating}
-              drawable={bestMoveArrow ? { autoShapes: [bestMoveArrow] } : {}}
+              viewOnly={gameOutcome !== GameResult.ONGOING}
+              drawable={
+                !isGameOver && bestMoveArrow
+                  ? { autoShapes: [bestMoveArrow] }
+                  : {}
+              }
             />
             {!isCalculating ? scoreJsx : <p>Calculating...</p>}
             {didInterrupt && (
@@ -137,6 +145,7 @@ function initGame(
 
 const appContainer = {
   border: "1px solid black",
+  width: "1265px",
 };
 
 const boardsContainer: CSSProperties = {
@@ -150,6 +159,7 @@ const gameWrapper = {
   borderRadius: "5px",
   boxShadow: `0 5px 15px rgba(0, 0, 0, 0.5)`,
   height: "800px",
+  width: "489px",
   overflow: "hidden",
 };
 

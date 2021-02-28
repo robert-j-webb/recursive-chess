@@ -43,7 +43,7 @@ export class StockfishWrapper {
         btime: 3000,
         winc: 1500,
         binc: 1500,
-        searchTime: 5000,
+        searchTime: 1000,
       };
       this.playerColor = "white";
       this.currentColor = "w";
@@ -58,13 +58,15 @@ export class StockfishWrapper {
         engineReady: false,
         search: "",
         isCalculating: false,
+        bestLine: [],
       };
     });
     return this;
   }
 
   onMessage(event: any) {
-    const line = event && typeof event === "object" ? event.data : event;
+    const line: string =
+      event && typeof event === "object" ? event.data : event;
 
     console.log("Reply: " + line);
     if (line === "uciok") {
@@ -97,7 +99,11 @@ export class StockfishWrapper {
           this.engineStatus.score = new Score(Math.abs(score), ScoreType.Mate);
         }
 
-        const bestLine = line.match(BEST_LINE_REGEX)[1].split(" ");
+        if (line.includes("pv")) {
+          this.engineStatus.bestLine = line
+            .match(BEST_LINE_REGEX)![1]
+            .split(" ");
+        }
 
         // /// Is the score bounded?
         // if ((match = line.match(/\b(upper|lower)bound\b/))) {
@@ -114,7 +120,7 @@ export class StockfishWrapper {
   async getBestMove(
     history: Move[],
     searchMoves?: string
-  ): Promise<{ bestMove: ChessMove; score: Score }> {
+  ): Promise<{ bestMove: ChessMove; score: Score; bestLine: string[] }> {
     if (this.engineStatus.isCalculating) {
       await pollUntil(() => !this.engineStatus.isCalculating);
     }
@@ -131,7 +137,11 @@ export class StockfishWrapper {
     const prevBestMoveCount = this.bestMoveCount;
     await pollUntil(() => prevBestMoveCount < this.bestMoveCount);
     this.engineStatus.isCalculating = false;
-    return { bestMove: this.lastBestMove!, score: this.engineStatus.score };
+    return {
+      bestMove: this.lastBestMove!,
+      score: this.engineStatus.score,
+      bestLine: this.engineStatus.bestLine,
+    };
   }
 
   getMoves(history: Move[]) {
@@ -179,6 +189,7 @@ interface EngineStatus {
   search: string;
   score: Score;
   isCalculating: boolean;
+  bestLine: string[];
 }
 
 interface ChessTime {
@@ -201,5 +212,5 @@ interface StockfishMessageWrapper {
   postRun: () => void;
 }
 
-// https://r\egex101.com/r/a7fsCh/1/
+// https://regex101.com/r/a7fsCh/1/
 const BEST_LINE_REGEX = /\spv\s([\s\w\s]*)/;

@@ -10,10 +10,16 @@ interface Props {
   getBestMove: (
     history: Move[],
     searchMoves?: string
-  ) => Promise<{ bestMove: ChessMove; score: Score }>;
+  ) => Promise<{ bestMove: ChessMove; score: Score; bestLine: string[] }>;
   stopCalculations: () => void;
   socket: Socket;
   id: number;
+}
+export enum GameResult {
+  WHITE_WIN = "White Won",
+  BLACK_WIN = "Black Won",
+  DRAW = "Draw",
+  ONGOING = 0,
 }
 
 class Game extends Component<Props> {
@@ -36,9 +42,10 @@ class Game extends Component<Props> {
     pgn: "",
     score: new Score(0, ScoreType.Centipawns),
     bestLine: "",
+    gameOutcome: GameResult.ONGOING,
   };
 
-  onMove = async (from, to) => {
+  onMove = async (from: any, to: any) => {
     const prevScore = this.state.score;
     const prevHistory = this.game.history({ verbose: true });
     // see if the move is legal
@@ -48,12 +55,20 @@ class Game extends Component<Props> {
       promotion: "q",
     });
 
-    // illegal move
-    if (move === null) return;
+    // illegal move or game is already over
+    if (move === null || this.state.gameOutcome !== 0) return;
 
     this.props.socket.emit("move", `${this.props.id},${from},${to}`);
-
     const fen = this.game.fen();
+
+    const gameOutcome = isGameOver(this.game);
+    if (gameOutcome !== 0) {
+      return this.setState({
+        gameOutcome,
+        fen,
+        pgn: this.game.pgn(),
+      });
+    }
 
     if (this.state.isCalculating) {
       this.props.stopCalculations();
@@ -72,24 +87,19 @@ class Game extends Component<Props> {
     );
 
     // By limiting the search to the move the player made, we can force stockfish to give us the actual move score.
-    const { score: actualMoveScore } = await this.props.getBestMove(
+    const { score: actualMoveScore, bestLine } = await this.props.getBestMove(
       prevHistory,
       `${from}${to}`
     );
 
-    if (
-      actualMoveScore.type === ScoreType.Mate &&
-      this.state.bestLine.length > 1
-    ) {
-      this.onMove(
-        this.state.bestLine[1].slice(0, 2),
-        this.state.bestLine[1].slice(2, 4)
-      );
+    if (actualMoveScore.type === ScoreType.Mate && bestLine.length > 1) {
+      this.onMove(bestLine[1].slice(0, 2), bestLine[1].slice(2, 4));
     }
 
     this.setState({
       isCalculating: false,
       bestMove,
+      bestLine,
       didInterrupt: false,
       score: actualMoveScore,
       scoreDiff: diffScores(
@@ -170,34 +180,30 @@ class Game extends Component<Props> {
   }
 
   render() {
-    const {
-      fen,
-      bestMove,
-      scoreDiff,
-      didInterrupt,
-      isCalculating,
-      pgn,
-      score,
-      bestLine,
-    } = this.state;
+    const { bestMove } = this.state;
     return (this.props.children as any)({
-      fen,
-      score,
-      bestLine,
+      ...this.state,
       onMove: this.onMove,
       turnColor: this.turnColor,
       calcMovable: this.calcMovable,
-      bestMove,
-      scoreDiff,
-      isCalculating,
-      didInterrupt,
       onFenSubmit: this.onFenSubmit.bind(this),
-      pgn,
       bestMoveArrow: bestMove
         ? { orig: bestMove![0], dest: bestMove![1], brush: "paleBlue" }
         : null,
     });
   }
+}
+
+function isGameOver(game: ChessInstance): GameResult {
+  if (game.in_checkmate()) {
+    // The current player is mated so we have to invert color
+    return game.turn() === "w" ? GameResult.BLACK_WIN : GameResult.WHITE_WIN;
+  }
+
+  if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition()) {
+    return GameResult.DRAW;
+  }
+  return GameResult.ONGOING;
 }
 
 export default Game;
