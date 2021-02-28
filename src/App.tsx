@@ -1,19 +1,46 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
-import Stockfish from "./Stockfish";
+import Game from "./Game";
 import PgnInput from "./PgnInput";
 import Chessground from "react-chessground";
 import "react-chessground/dist/styles/chessground.css";
 import ScoreDisplay from "./ScoreDisplay";
+import { StockfishWrapper, Score, ScoreType } from "./StockfishWrapper";
+import { io } from "socket.io-client";
 
 function App() {
+  const socket = io("ws://localhost:3001");
+
+  const [score, setScore] = useState<Score>(new Score(0, ScoreType.Centipawns));
+  const [bestLine, setBestLine] = useState<string[]>([]);
+  const [stockfishWrapper, setStockfishWrapper] = useState<StockfishWrapper>();
+  useEffect(
+    () => {
+      new StockfishWrapper()
+        .init(setScore, setBestLine)
+        .then((wrapper) => setStockfishWrapper(wrapper));
+    },
+    [] /* never rerender */
+  );
+  if (!stockfishWrapper!) {
+    return <div>Loading</div>;
+  }
+  const getBestMove = stockfishWrapper.getBestMove.bind(stockfishWrapper);
+  const stopCalculations = stockfishWrapper.stopCalculations.bind(
+    stockfishWrapper
+  );
   return (
     <div style={boardsContainer}>
-      <Stockfish>
+      <Game
+        score={score}
+        bestLine={bestLine}
+        getBestMove={getBestMove}
+        stopCalculations={stopCalculations}
+        socket={socket}
+      >
         {({
           fen,
           onMove,
-          score,
           turnColor,
           calcMovable,
           lastMove,
@@ -24,7 +51,6 @@ function App() {
           isCalculating,
           onFenSubmit,
           pgn,
-          bestLine,
         }) => {
           const scoreJsx = (
             <div>
@@ -60,7 +86,7 @@ function App() {
             </div>
           );
         }}
-      </Stockfish>
+      </Game>
     </div>
   );
 }

@@ -1,5 +1,21 @@
 import { Move } from "chess.js";
 
+export enum ScoreType {
+  Centipawns,
+  Lowerbound,
+  Upperbound,
+  Mate,
+}
+
+export class Score {
+  val: number = 0;
+  type: ScoreType = ScoreType.Centipawns;
+  constructor(val: number, type: ScoreType) {
+    this.val = val;
+    this.type = type;
+  }
+}
+
 declare global {
   interface Window {
     Stockfish: StockfishMessageWrapper;
@@ -13,13 +29,18 @@ export class StockfishWrapper {
   private engineStatus!: EngineStatus;
   private time!: ChessTime;
   private playerColor!: "white" | "black";
-  private setScore!: (state: Score, bestLine: string[]) => void;
+  private setScore!: (state: Score) => void;
+  private setBestLine!: (bestLine: string[]) => void;
   private lastBestMove?: ChessMove;
   private bestMoveCount = 0;
   public currentColor!: string;
 
-  async init(setScore: (state: Score, bestLine: string[]) => void) {
+  async init(
+    setScore: (state: Score) => void,
+    setBestLine: (bestLine: string[]) => void
+  ): Promise<StockfishWrapper> {
     this.setScore = setScore;
+    this.setBestLine = setBestLine;
 
     await window.Stockfish().then((sf) => {
       sf.addMessageListener((line) => this.onMessage(line));
@@ -45,6 +66,7 @@ export class StockfishWrapper {
         isCalculating: false,
       };
     });
+    return this;
   }
 
   onMessage(event: any) {
@@ -94,7 +116,8 @@ export class StockfishWrapper {
         //     type: isUpper ? ScoreType.Upperbound : ScoreType.Lowerbound,
         //   };
         // }
-        this.setScore(this.engineStatus.score, bestLine);
+        this.setScore(this.engineStatus.score);
+        this.setBestLine(bestLine);
       }
     }
   }
@@ -157,18 +180,6 @@ async function pollUntil<T>(
 }
 
 type ChessMove = string[];
-
-export interface Score {
-  val: number;
-  type: ScoreType;
-}
-
-export enum ScoreType {
-  Centipawns,
-  Lowerbound,
-  Upperbound,
-  Mate,
-}
 
 interface EngineStatus {
   engineLoaded: boolean;

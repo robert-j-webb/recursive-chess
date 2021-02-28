@@ -1,30 +1,42 @@
 import { Component } from "react";
 import PropTypes from "prop-types";
-import { StockfishWrapper, ScoreType, Score } from "./StockfishWrapper";
-import Chess, { ChessInstance } from "chess.js";
+import { ScoreType, Score } from "./StockfishWrapper";
+import Chess, { ChessInstance, Move } from "chess.js";
 import { diffScores } from "./ScoreDisplay";
-import { io } from "socket.io-client";
+import { Socket } from "socket.io-client";
 
-class Stockfish extends Component {
-  private stockfishWrapper = new StockfishWrapper();
+interface Props {
+  children: unknown;
+  score: Score;
+  bestLine: string[];
+  getBestMove: (history: Move[], searchMoves?: string) => Promise<string[]>;
+  stopCalculations: () => void;
+  socket: Socket;
+}
+
+class Game extends Component<Props> {
   private game!: ChessInstance;
-  private socket = io("ws://localhost:3001");
 
-  static propTypes = { children: PropTypes.func };
+  static propTypes = {
+    children: PropTypes.func,
+    score: PropTypes.instanceOf(Score),
+    bestLine: PropTypes.arrayOf(PropTypes.string),
+    getBestMove: PropTypes.func,
+    stopCalculations: PropTypes.func,
+    socket: PropTypes.instanceOf(Socket),
+  };
 
   state = {
     fen: "start",
-    score: { val: 0, type: ScoreType.Centipawns } as Score,
     bestMove: undefined,
     scoreDiff: undefined,
     isCalculating: false,
     didInterrupt: false,
     pgn: "",
-    bestLine: [] as string[],
   };
 
   onMove = async (from, to) => {
-    const prevScore = this.state.score;
+    const prevScore = this.props.score;
     const prevHistory = this.game.history({ verbose: true });
     // see if the move is legal
     const move = this.game.move({
@@ -36,12 +48,12 @@ class Stockfish extends Component {
     // illegal move
     if (move === null) return;
 
-    this.socket.send(`${from},${to}`);
+    this.props.socket.send(`${from},${to}`);
 
     const fen = this.game.fen();
 
     if (this.state.isCalculating) {
-      this.stockfishWrapper.stopCalculations();
+      this.props.stopCalculations();
       this.setState({ didInterrupt: true });
     }
 
@@ -52,20 +64,20 @@ class Stockfish extends Component {
     });
 
     // We ask stockfish what was the best possible move the player could have made.
-    const bestMove = await this.stockfishWrapper.getBestMove(prevHistory);
-    const bestPossbileScore = this.state.score;
+    const bestMove = await this.props.getBestMove(prevHistory);
+    const bestPossbileScore = this.props.score;
 
     // By limiting the search to the move the player made, we can force stockfish to give us the actual move score.
-    await this.stockfishWrapper.getBestMove(prevHistory, `${from}${to}`);
-    const actualMoveScore = this.state.score;
+    await this.props.getBestMove(prevHistory, `${from}${to}`);
+    const actualMoveScore = this.props.score;
 
     if (
       actualMoveScore.type === ScoreType.Mate &&
-      this.state.bestLine.length > 1
+      this.props.bestLine.length > 1
     ) {
       this.onMove(
-        this.state.bestLine[1].slice(0, 2),
-        this.state.bestLine[1].slice(2, 4)
+        this.props.bestLine[1].slice(0, 2),
+        this.props.bestLine[1].slice(2, 4)
       );
     }
 
@@ -138,11 +150,8 @@ class Stockfish extends Component {
 
   async componentDidMount() {
     this.game = (Chess as any)();
-    await this.stockfishWrapper.init((score, bestLine) =>
-      this.setState({ score, bestLine })
-    );
 
-    this.socket.onAny(async (data: string) => {
+    this.props.socket.onAny(async (data: string) => {
       const [from, to] = data.split(",");
       this.onMove(from, to);
     });
@@ -153,18 +162,15 @@ class Stockfish extends Component {
   render() {
     const {
       fen,
-      score,
       bestMove,
       scoreDiff,
       didInterrupt,
       isCalculating,
       pgn,
-      bestLine,
     } = this.state;
     return (this.props.children as any)({
       fen,
       onMove: this.onMove,
-      score,
       turnColor: this.turnColor,
       calcMovable: this.calcMovable,
       bestMove,
@@ -172,7 +178,6 @@ class Stockfish extends Component {
       isCalculating,
       didInterrupt,
       onFenSubmit: this.onFenSubmit.bind(this),
-      bestLine,
       pgn,
       bestMoveArrow: bestMove
         ? { orig: bestMove![0], dest: bestMove![1], brush: "paleBlue" }
@@ -181,4 +186,4 @@ class Stockfish extends Component {
   }
 }
 
-export default Stockfish;
+export default Game;
