@@ -5,10 +5,11 @@ import PgnInput from "./PgnInput";
 import Chessground from "react-chessground";
 import "react-chessground/dist/styles/chessground.css";
 import ScoreDisplay from "./ScoreDisplay";
-import { StockfishWrapper, Score, ScoreType } from "./StockfishWrapper";
-import { io } from "socket.io-client";
+import { StockfishWrapper, Score, ChessMove } from "./StockfishWrapper";
+import { io, Socket } from "socket.io-client";
+import { Move } from "chess.js";
 
-type gameFunctor = (id: number) => JSX.Element;
+type gameFunctor = (id: number, addGame: () => void) => JSX.Element;
 
 let gameId = 0;
 
@@ -17,7 +18,7 @@ function App() {
 
   const [stockfishWrapper, setStockfishWrapper] = useState<StockfishWrapper>();
   const [games, setGames] = useState<{ id: number; func: gameFunctor }[]>([]);
-  let addGame = () => {
+  let addGame = (pgn?: string) => {
     return;
   };
   useEffect(
@@ -28,10 +29,13 @@ function App() {
     },
     [] /* never rerender */
   );
-  useEffect(() => void socket.on("add", addGame));
+  useEffect(() => {
+    socket.on("add", (pgn: string) => addGame(pgn));
+    return () => void socket.off("add");
+  });
 
   useEffect(() => {
-    games.length < 1 && setTimeout(addGame, 1000);
+    games.length < 1 && stockfishWrapper && setTimeout(addGame, 100);
   });
 
   if (!stockfishWrapper!) {
@@ -42,26 +46,25 @@ function App() {
     stockfishWrapper
   );
 
-  addGame = () => {
-    setGames(
-      games.concat([
-        {
-          id: gameId++,
-          func: initGame(getBestMove, stopCalculations, socket),
-        },
-      ])
-    );
+  addGame = (pgn?: string) => {
+    setGames((games) => [
+      ...games,
+      {
+        id: gameId++,
+        func: initGame(getBestMove, stopCalculations, socket, pgn),
+      },
+    ]);
   };
 
   return (
     <div style={appContainer}>
-      <button type="submit" value="Submit" onClick={addGame}>
+      <button type="submit" value="Submit" onClick={() => addGame()}>
         AddGame
       </button>
       <div style={boardsContainer}>
         {games.map((game) => (
           <div style={gameWrapper} key={game.id}>
-            {game.func(game.id)}
+            {game.func(game.id, addGame)}
           </div>
         ))}
       </div>
@@ -70,16 +73,22 @@ function App() {
 }
 
 function initGame(
-  getBestMove,
-  stopCalculations,
-  socket
-): (id: number) => JSX.Element {
-  return (id: number) => (
+  getBestMove: (
+    history: Move[],
+    searchMoves?: string
+  ) => Promise<{ bestMove: ChessMove; score: Score; bestLine: string[] }>,
+  stopCalculations: () => void,
+  socket: Socket,
+  pgn?: string
+): gameFunctor {
+  return (id: number, addGame: () => void) => (
     <Game
       getBestMove={getBestMove}
       stopCalculations={stopCalculations}
       socket={socket}
       id={id}
+      addGame={addGame}
+      prevGame={pgn}
     >
       {({
         fen,
@@ -102,7 +111,7 @@ function initGame(
 
         const scoreJsx = (
           <div style={scoreDisplay}>
-            {!isGameOver && <p>Game over: {gameOutcome}</p>}
+            {isGameOver && <p>Game over: {gameOutcome}</p>}
             <ScoreDisplay score={score} />
             <p>bestMove: {bestMove}</p>
             <p>scoreDiff: {scoreDiff}</p>
@@ -123,7 +132,7 @@ function initGame(
               fen={fen}
               onMove={onMove}
               style={{ margin: "auto" }}
-              viewOnly={gameOutcome !== GameResult.ONGOING}
+              viewOnly={isGameOver}
               drawable={
                 !isGameOver && bestMoveArrow
                   ? { autoShapes: [bestMoveArrow] }

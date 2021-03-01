@@ -1,9 +1,10 @@
 import { Component } from "react";
 import PropTypes from "prop-types";
 import { ScoreType, Score, ChessMove } from "./StockfishWrapper";
-import Chess, { ChessInstance, Move } from "chess.js";
+import Chess, { ChessInstance, Move, Square } from "chess.js";
 import { diffScores } from "./ScoreDisplay";
 import { Socket } from "socket.io-client";
+import { textSpanIsEmpty } from "typescript";
 
 interface Props {
   children: unknown;
@@ -12,8 +13,10 @@ interface Props {
     searchMoves?: string
   ) => Promise<{ bestMove: ChessMove; score: Score; bestLine: string[] }>;
   stopCalculations: () => void;
+  addGame: (pgn: string) => void;
   socket: Socket;
   id: number;
+  prevGame?: string;
 }
 export enum GameResult {
   WHITE_WIN = "White Won",
@@ -29,8 +32,10 @@ class Game extends Component<Props> {
     children: PropTypes.func,
     getBestMove: PropTypes.func,
     stopCalculations: PropTypes.func,
+    addGame: PropTypes.func,
     socket: PropTypes.instanceOf(Socket),
     id: PropTypes.number,
+    prevGame: PropTypes.string,
   };
 
   state = {
@@ -45,7 +50,7 @@ class Game extends Component<Props> {
     gameOutcome: GameResult.ONGOING,
   };
 
-  onMove = async (from: any, to: any) => {
+  onMove = async (from: any, to: any, options?: { fromSocket: boolean }) => {
     const prevScore = this.state.score;
     const prevHistory = this.game.history({ verbose: true });
     // see if the move is legal
@@ -58,7 +63,9 @@ class Game extends Component<Props> {
     // illegal move or game is already over
     if (move === null || this.state.gameOutcome !== 0) return;
 
-    this.props.socket.emit("move", `${this.props.id},${from},${to}`);
+    if (!options?.fromSocket) {
+      this.props.socket.emit("move", `${this.props.id},${from},${to}`);
+    }
     const fen = this.game.fen();
 
     const gameOutcome = isGameOver(this.game);
@@ -96,18 +103,33 @@ class Game extends Component<Props> {
       this.onMove(bestLine[1].slice(0, 2), bestLine[1].slice(2, 4));
     }
 
+    const scoreDiff = diffScores(
+      actualMoveScore,
+      prevScore,
+      bestPossbileScore,
+      this.game.turn()
+    );
+
+    if (scoreDiff.includes("fuck") && !options?.fromSocket) {
+      const newGame: ChessInstance = (Chess as any)();
+      newGame.load_pgn(this.game.pgn());
+      newGame.undo();
+      newGame.move({
+        from: bestMove[0] as Square,
+        to: bestMove[1] as Square,
+        promotion: "q",
+      });
+      this.props.addGame(newGame.pgn());
+      this.props.socket.emit("add", newGame.pgn());
+    }
+
     this.setState({
       isCalculating: false,
       bestMove,
       bestLine,
       didInterrupt: false,
       score: actualMoveScore,
-      scoreDiff: diffScores(
-        actualMoveScore,
-        prevScore,
-        bestPossbileScore,
-        this.game.turn()
-      ),
+      scoreDiff,
     });
   };
 
@@ -167,13 +189,16 @@ class Game extends Component<Props> {
 
   async componentDidMount() {
     this.game = (Chess as any)();
+    if (this.props.prevGame) {
+      this.game.load_pgn(this.props.prevGame);
+    }
 
     this.props.socket.on("move", async (data: string) => {
       const [id, from, to] = data.split(",");
       if (Number(id) !== this.props.id) {
         return;
       }
-      this.onMove(from, to);
+      this.onMove(from, to, { fromSocket: true });
     });
 
     this.setState({ fen: this.game.fen() });
