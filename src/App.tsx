@@ -8,17 +8,21 @@ import ScoreDisplay from "./ScoreDisplay";
 import { StockfishWrapper, Score, ChessMove } from "./StockfishWrapper";
 import { io, Socket } from "socket.io-client";
 import { Move } from "chess.js";
+import {
+  GameState,
+  getAllGames,
+  updateAllGameState,
+  getNextGameId,
+} from "./GlobalState";
 
 type gameFunctor = (id: number, addGame: () => void) => JSX.Element;
-
-let gameId = 0;
 
 function App() {
   const socket = io("ws://localhost:3001");
 
   const [stockfishWrapper, setStockfishWrapper] = useState<StockfishWrapper>();
   const [games, setGames] = useState<{ id: number; func: gameFunctor }[]>([]);
-  let addGame = (pgn?: string) => {
+  let addGame = (pgn?: string, id?: number) => {
     return;
   };
   useEffect(
@@ -33,6 +37,12 @@ function App() {
     socket.on("add", (pgn: string) => addGame(pgn));
     return () => void socket.off("add");
   });
+  useEffect(() => {
+    socket.on("synchronize", (data: string) => {
+      updateAllGameState(data, addGame);
+      setGames((games) => [...games]);
+    });
+  });
 
   useEffect(() => {
     games.length < 1 && stockfishWrapper && setTimeout(addGame, 100);
@@ -46,20 +56,27 @@ function App() {
     stockfishWrapper
   );
 
-  addGame = (pgn?: string) => {
+  addGame = (pgn?: string, id?: number) => {
     setGames((games) => [
       ...games,
       {
-        id: gameId++,
+        id: id ? id : getNextGameId(),
         func: initGame(getBestMove, stopCalculations, socket, pgn),
       },
     ]);
   };
 
+  const synchronize = () => {
+    socket.emit(
+      "synchronize",
+      JSON.stringify(getAllGames().map((state: GameState) => state.serialize()))
+    );
+  };
+
   return (
     <div style={appContainer}>
-      <button type="submit" value="Submit" onClick={() => addGame()}>
-        AddGame
+      <button type="submit" value="Submit" onClick={() => synchronize()}>
+        Synchronize
       </button>
       <div style={boardsContainer}>
         {games.map((game) => (

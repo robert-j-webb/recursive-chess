@@ -4,7 +4,7 @@ import { ScoreType, Score, ChessMove } from "./StockfishWrapper";
 import Chess, { ChessInstance, Move, Square } from "chess.js";
 import { diffScores } from "./ScoreDisplay";
 import { Socket } from "socket.io-client";
-import { textSpanIsEmpty } from "typescript";
+import { addGame } from "./GlobalState";
 
 interface Props {
   children: unknown;
@@ -192,6 +192,7 @@ class Game extends Component<Props> {
     if (this.props.prevGame) {
       this.game.load_pgn(this.props.prevGame);
     }
+    addGame(this.game, this.props.id);
 
     this.props.socket.on("move", async (data: string) => {
       const [id, from, to] = data.split(",");
@@ -200,6 +201,19 @@ class Game extends Component<Props> {
       }
       this.onMove(from, to, { fromSocket: true });
     });
+
+    // When the global instance gets a synchronize event, we also want to force a rerender here.
+    this.props.socket.on(
+      "synchronize",
+      async () =>
+        void setTimeout(() => {
+          const prevMove = this.game.undo()!;
+          this.setState({ score: 0 });
+          if (prevMove) {
+            this.onMove(prevMove.from, prevMove.to, { fromSocket: true });
+          }
+        }, 10)
+    );
 
     this.setState({ fen: this.game.fen() });
   }
